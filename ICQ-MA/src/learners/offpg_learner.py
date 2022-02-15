@@ -104,6 +104,7 @@ class OffPGLearner:
             self.log_stats_t = t_env
 
     def train_critic(self, on_batch, best_batch=None, log=None, t_env=None):
+        # on_batch.cude()
         bs = on_batch['batch_size']
         max_t = on_batch['max_seq_length']
         rewards = on_batch["reward"][:, :-1]

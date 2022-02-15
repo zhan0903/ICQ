@@ -1,0 +1,36 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "debug_icq",
+            "type": "python",
+            "request": "launch",
+            "program": "src/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--config=offpg_smac",
+                "--env-config=sc2"
+            ]
+        },
+        {
+            "name": "debug_ours",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/offline.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--env",
+                "halfcheetah-medium-replay-v0",
+                "--version",
+                "08241457_debug",
+                "--engine",
+                "ours",
+                "--plot_name",
+                "debug"
+            ]
+        },
+    ]
+}

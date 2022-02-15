@@ -112,14 +112,14 @@ def run_sequential(args, logger):
     # --------------------------- hdf5 -------------------------------
     import h5py
     hdFile_r = h5py.File(args.env_args['map_name'] + '.h5', 'r')
-    actions_h = th.tensor(hdFile_r.get('actions'))
-    actions_onehot_h = th.tensor(hdFile_r.get('actions_onehot'))
-    avail_actions_h = th.tensor(hdFile_r.get('avail_actions'))
-    filled_h = th.tensor(hdFile_r.get('filled'))
-    obs_h = th.tensor(hdFile_r.get('obs'))
-    reward_h = th.tensor(hdFile_r.get('reward'))
-    state_h = th.tensor(hdFile_r.get('state'))
-    terminated_h = th.tensor(hdFile_r.get('terminated'))
+    actions_h = th.tensor(hdFile_r.get('actions')).to(args.device)
+    actions_onehot_h = th.tensor(hdFile_r.get('actions_onehot')).to(args.device)
+    avail_actions_h = th.tensor(hdFile_r.get('avail_actions')).to(args.device)
+    filled_h = th.tensor(hdFile_r.get('filled')).to(args.device)
+    obs_h = th.tensor(hdFile_r.get('obs')).to(args.device)
+    reward_h = th.tensor(hdFile_r.get('reward')).to(args.device)
+    state_h = th.tensor(hdFile_r.get('state')).to(args.device)
+    terminated_h = th.tensor(hdFile_r.get('terminated')).to(args.device)
 
     # ----------------------------train-------------------------------
     while runner.t_env <= args.t_max:
