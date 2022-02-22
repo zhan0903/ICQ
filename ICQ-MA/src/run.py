@@ -4,6 +4,7 @@ import pprint
 from textwrap import fill
 import time
 import math as mth
+from turtle import update
 import numpy as np
 import threading
 import torch as th
@@ -108,6 +109,7 @@ def run_sequential(args, logger):
     last_time = start_time
     logger.console_logger.info("Beginning training for {} timesteps".format(args.t_max))    
     episode_num = 0
+    update_num = 0
     
     # --------------------------- hdf5 -------------------------------
     import h5py
@@ -121,9 +123,12 @@ def run_sequential(args, logger):
     state_h = th.tensor(hdFile_r.get('state')).to(args.device)
     terminated_h = th.tensor(hdFile_r.get('terminated')).to(args.device)
 
-    # ----------------------------train-------------------------------
+    # ----------------------------pre train-------------------------------
     while runner.t_env <= args.t_max:
         if runner.t_env >= 4000200:
+            break
+
+        if learner.critic_training_steps >= 200000:
             break
 
         th.set_num_threads(8)
@@ -194,7 +199,9 @@ def run_sequential(args, logger):
             last_log_T = runner.t_env
         
         episode_num += 1
+        update_num += 1
         runner.t_env += 100
+
 
     runner.close_env()
     logger.console_logger.info("Finished Training")

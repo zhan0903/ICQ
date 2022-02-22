@@ -43,7 +43,35 @@ class ParallelRunner:
         self.log_train_stats_t = -100000
 
     def setup(self, scheme, groups, preprocess, mac):
-        self.new_batch = partial(EpisodeBatch_Runner, scheme, groups, self.batch_size, self.episode_limit + 1,
+        ## add h5py offline data
+        import h5py
+        hdFile_r = h5py.File(self.args.env_args['map_name'] + '.h5', 'r')
+
+        actions_h = th.tensor(hdFile_r.get('actions'))#.to(self.args.device)
+        actions_onehot_h = th.tensor(hdFile_r.get('actions_onehot'))#.to(self.args.device)
+        avail_actions_h = th.tensor(hdFile_r.get('avail_actions'))#.to(self.args.device)
+        filled_h = th.tensor(hdFile_r.get('filled'))#.to(self.args.device)
+        obs_h = th.tensor(hdFile_r.get('obs'))#.to(self.args.device)
+        reward_h = th.tensor(hdFile_r.get('reward'))#.to(self.args.device)
+        state_h = th.tensor(hdFile_r.get('state'))#.to(args.device)
+        terminated_h = th.tensor(hdFile_r.get('terminated'))#.to(args.device)
+
+
+        data = SN()
+        data.transition_data = {}
+        data.transition_data['state']=state_h
+        data.transition_data['actions']=actions_h
+        data.transition_data['obs']=obs_h
+        data.transition_data['avail_actions']=avail_actions_h
+        data.transition_data['reward']=reward_h
+        data.transition_data['terminated']=terminated_h
+        data.transition_data['actions_onehot']=actions_onehot_h
+        data.transition_data['filled']=filled_h
+        data.episode_data = {}
+
+        self.off_batch = partial(EpisodeBatch_Runner, scheme, groups, self.batch_size, self.episode_limit + 1, data=data,
+                                 preprocess=preprocess, device=self.args.device)
+        self.on_batch = partial(EpisodeBatch_Runner, scheme, groups, self.batch_size, self.episode_limit + 1,
                                  preprocess=preprocess, device=self.args.device)
         self.mac = mac
         self.scheme = scheme
@@ -79,12 +107,13 @@ class ParallelRunner:
             pre_transition_data["avail_actions"].append(data["avail_actions"])
             pre_transition_data["obs"].append(data["obs"])
 
-        self.batch.update(pre_transition_data, ts=0)
+        self.off_batch.update(pre_transition_data, ts=0)
+        self.on_batch.update(pre_transition_data, ts=0)
 
         self.t = 0
         self.env_steps_this_run = 0
 
-    def explore(self, test_mode=False):
+    def explore(self,test_mode=False):
         self.reset()
 
         all_terminated = False
@@ -109,7 +138,9 @@ class ParallelRunner:
             actions_chosen = {
                 "actions": actions.unsqueeze(1)
             }
-            self.batch.update(actions_chosen, bs=envs_not_terminated, ts=self.t, mark_filled=False)
+            self.off_batch.update(actions_chosen, bs=envs_not_terminated, ts=self.t, mark_filled=False)
+            self.on_batch.update(actions_chosen, bs=envs_not_terminated, ts=self.t, mark_filled=False)
+
 
             # Send actions to each env
             action_idx = 0
@@ -163,13 +194,17 @@ class ParallelRunner:
                     pre_transition_data["obs"].append(data["obs"])
 
             # Add post_transiton data into the batch
-            self.batch.update(post_transition_data, bs=envs_not_terminated, ts=self.t, mark_filled=False)
+            self.off_batch.update(post_transition_data, bs=envs_not_terminated, ts=self.t, mark_filled=False)
+            self.on_batch.update(post_transition_data, bs=envs_not_terminated, ts=self.t, mark_filled=False)
+
 
             # Move onto the next timestep
             self.t += 1
 
             # Add the pre-transition data
-            self.batch.update(pre_transition_data, bs=envs_not_terminated, ts=self.t, mark_filled=True)
+            self.off_batch.update(pre_transition_data, bs=envs_not_terminated, ts=self.t, mark_filled=True)
+            self.on_batch.update(pre_transition_data, bs=envs_not_terminated, ts=self.t, mark_filled=True)
+
 
         if not test_mode:
             self.t_env += self.env_steps_this_run
@@ -201,9 +236,9 @@ class ParallelRunner:
             if hasattr(self.mac.action_selector, "epsilon"):
                 self.logger.log_stat("epsilon", self.mac.action_selector.epsilon, self.t_env)
             self.log_train_stats_t = self.t_env
+        
 
         return self.batch
- 
  
     def run(self, test_mode=False):
         self.reset()
@@ -350,11 +385,11 @@ def env_worker(remote, env_fn):
         if cmd == "step":
             actions = data
             # Take a step in the environment
-            reward, terminated, env_info = env.step(actions) # (3,) three actions control 3 agent?
+            reward, terminated, env_info = env.step(actions)
             # Return the observations, avail_actions and state to make the next action
-            state = env.get_state() # (27,)
-            avail_actions = env.get_avail_actions() # three list each with (9,)
-            obs = env.get_obs() # three list each with (36,)
+            state = env.get_state()
+            avail_actions = env.get_avail_actions()
+            obs = env.get_obs()
             remote.send({
                 # Data for the next timestep needed to pick an action
                 "state": state,

@@ -2,6 +2,10 @@ import torch as th
 import numpy as np
 from types import SimpleNamespace as SN
 
+
+device = th.device("cuda" if th.cuda.is_available() else "cpu")
+
+
 class EpisodeBatch_Runner:
     def __init__(self,
                  scheme,
@@ -53,7 +57,7 @@ class EpisodeBatch_Runner:
             "filled": {"vshape": (1,), "dtype": th.long},
         })
 
-        for field_key, field_info in scheme.items():
+        for field_key, field_info in scheme.items(): # iniliaze obs state ... shape
             assert "vshape" in field_info, "Scheme must define vshape for {}".format(field_key)
             vshape = field_info["vshape"]
             episode_const = field_info.get("episode_const", False)
@@ -75,7 +79,7 @@ class EpisodeBatch_Runner:
                 if field_key is 'policy':
                     self.data.transition_data[field_key] = th.ones((batch_size, max_seq_length, *shape), dtype=dtype, device=self.device)
                 else:
-                    self.data.transition_data[field_key] = th.zeros((batch_size, max_seq_length, *shape), dtype=dtype, device=self.device)
+                    self.data.transition_data[field_key] = th.zeros((batch_size, max_seq_length, *shape), dtype=dtype, device=self.device) # max_seq_length == 151
 
     def extend(self, scheme, groups=None):
         self._setup_data(scheme, self.groups if groups is None else groups, self.batch_size, self.max_seq_length)
@@ -282,6 +286,45 @@ class EpisodeBatch:
 
     def extend(self, scheme, groups=None):
         self._setup_data(scheme, self.groups if groups is None else groups, self.batch_size, self.max_seq_length)
+
+    ## addh5py
+    def addh5py(self,hdFile_r):
+        self.actions_h = th.tensor(hdFile_r.get('actions')).to(device)
+        self.actions_onehot_h = th.tensor(hdFile_r.get('actions_onehot')).to(device)
+        self.avail_actions_h = th.tensor(hdFile_r.get('avail_actions')).to(device)
+        self.filled_h = th.tensor(hdFile_r.get('filled')).to(device)
+        self.obs_h = th.tensor(hdFile_r.get('obs')).to(device)
+        self.reward_h = th.tensor(hdFile_r.get('reward')).to(device)
+        self.state_h = th.tensor(hdFile_r.get('state')).to(device)
+        self.terminated_h = th.tensor(hdFile_r.get('terminated')).to(device)
+
+    def random_sample(self,batch_size=32):
+        sample_number = np.random.choice(len(self.actions_h), batch_size, replace=False)
+        filled_sample = self.filled_h[sample_number]
+        max_ep_t_h = filled_sample.sum(1).max(0)[0]
+        filled_sample = filled_sample[:, :max_ep_t_h]
+        actions_sample = self.actions_h[sample_number][:, :max_ep_t_h]
+        actions_onehot_sample = self.actions_onehot_h[sample_number][:, :max_ep_t_h]
+        avail_actions_sample = self.avail_actions_h[sample_number][:, :max_ep_t_h]
+        obs_sample = self.obs_h[sample_number][:, :max_ep_t_h]
+        reward_sample = self.reward_h[sample_number][:, :max_ep_t_h]
+        state_sample = self.state_h[sample_number][:, :max_ep_t_h]
+        terminated_sample = self.terminated_h[sample_number][:, :max_ep_t_h]
+
+        off_batch = {}
+        off_batch['obs'] = obs_sample
+        off_batch['reward'] = reward_sample
+        off_batch['actions'] = actions_sample
+        off_batch['actions_onehot'] = actions_onehot_sample
+        off_batch['avail_actions'] = avail_actions_sample
+        off_batch['filled'] = filled_sample
+        off_batch['state'] = state_sample
+        off_batch['terminated'] = terminated_sample
+        off_batch['batch_size'] = batch_size
+        off_batch['max_seq_length'] = max_ep_t_h
+
+        return off_batch
+
 
     def to(self, device):
         for k, v in self.data.transition_data.items():
