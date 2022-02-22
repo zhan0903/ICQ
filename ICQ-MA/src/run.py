@@ -125,8 +125,8 @@ def run_sequential(args, logger):
 
     # ----------------------------pre train-------------------------------
     while runner.t_env <= args.t_max:
-        if runner.t_env >= 4000200:
-            break
+        # if runner.t_env >= 4000200:
+        #     break
 
         if learner.critic_training_steps >= 200000:
             break

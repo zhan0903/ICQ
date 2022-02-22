@@ -141,7 +141,7 @@ class replaybuffer_mine:
         self.size = 0
         self.online_window = 320
         
-    def add_online_batch(self,batch):
+    def add_online_batch(self,batch):# sample trajectories not tuples
         # c = torch.cat((c, ones), 1)
         onlinesize = len(batch.data.transition_data['actions'])
         if self.current_online_size < self.online_window:
@@ -340,7 +340,10 @@ def run_sequential(args, logger):
 
     # ----------------------------pre train-------------------------------
     while runner.t_env <= args.t_max:
-        if runner.t_env >= 4000200:
+        # if runner.t_env >= 4000200:
+        #     break
+
+        if learner.critic_training_steps >= 200000:
             break
 
         th.set_num_threads(8)
@@ -356,14 +359,14 @@ def run_sequential(args, logger):
             "q_max_var": [],
             "q_min_var": []
         }
-        if update_num > 1:# 100000
+        if learner.critic_training_steps > 100000:# 100000
             online_explore(runner,buffer_mine)
 
         p = np.random.uniform()
 
-        if update_num > 1 and p < 0.5:
+        if learner.critic_training_steps > 100000 and p < 0.5:
             on_batch = buffer_mine.random_sample(batch_size=32,online=True)
-            offline_training(learner,runner,on_batch,running_log,greedy=True)
+            offline_training(learner,runner,on_batch,running_log,greedy=True) # greedy not implemented
         else:
             off_batch = buffer_mine.random_sample(batch_size=32,online=False)
             offline_training(learner,runner,off_batch,running_log,greedy=False)
