@@ -123,12 +123,14 @@ def run_sequential(args, logger):
     state_h = th.tensor(hdFile_r.get('state')).to(args.device)
     terminated_h = th.tensor(hdFile_r.get('terminated')).to(args.device)
 
+    max_steps = 1000000
+
     # ----------------------------pre train-------------------------------
     while runner.t_env <= args.t_max:
         # if runner.t_env >= 4000200:
         #     break
 
-        if learner.critic_training_steps >= 200000:
+        if learner.critic_training_steps >= max_steps:
             break
 
         th.set_num_threads(8)
@@ -174,16 +176,17 @@ def run_sequential(args, logger):
         learner.train(off_batch, runner.t_env, running_log)
 
         n_test_runs = max(1, args.test_nepisode // runner.batch_size)
-        if (runner.t_env - last_test_T) / args.test_interval >= 1.0: # args.test_interval
+        if (learner.critic_training_steps - last_test_T) / args.test_interval >= 1.0: # args.test_interval
 
             logger.console_logger.info("t_env: {} / {}".format(runner.t_env, args.t_max))
+            logger.console_logger.info("critic_training_steps: {} / {}".format(learner.critic_training_steps, max_steps))
             logger.console_logger.info("Estimated time left: {}. Time passed: {}".format(
-                time_left(last_time, last_test_T, runner.t_env, args.t_max), time_str(time.time() - start_time)))
+                time_left(last_time, last_test_T, learner.critic_training_steps, args.t_max), time_str(time.time() - start_time)))
             last_time = time.time()
 
-            last_test_T = runner.t_env
+            last_test_T = learner.critic_training_steps
             for _ in range(n_test_runs):
-                runner.run(test_mode=True)
+                runner.run(learner.critic_training_steps,test_mode=True)
 
         if args.save_model and (runner.t_env - model_save_time >= args.save_model_interval or model_save_time == 0):
             model_save_time = runner.t_env
@@ -193,14 +196,14 @@ def run_sequential(args, logger):
 
         episode += args.batch_size_run
 
-        if (runner.t_env - last_log_T) >= args.log_interval:
-            logger.log_stat("episode", episode, runner.t_env)
+        if (learner.critic_training_steps - last_log_T) >= args.log_interval:
+            logger.log_stat("episode", episode, learner.critic_training_steps)
             logger.print_recent_stats()
-            last_log_T = runner.t_env
+            last_log_T = learner.critic_training_steps
         
         episode_num += 1
         update_num += 1
-        runner.t_env += 100
+        # runner.t_env += 100
 
 
     runner.close_env()

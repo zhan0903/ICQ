@@ -34,6 +34,7 @@ class ParallelRunner:
         self.t = 0
 
         self.t_env = 0
+        self.training_steps = 0
 
         self.train_returns = []
         self.test_returns = []
@@ -183,30 +184,31 @@ class ParallelRunner:
             env_stat = parent_conn.recv()
             env_stats.append(env_stat)
 
-        cur_stats = self.test_stats if test_mode else self.train_stats
-        cur_returns = self.test_returns if test_mode else self.train_returns
-        log_prefix = "test_" if test_mode else ""
-        infos = [cur_stats] + final_env_infos
-        cur_stats.update({k: sum(d.get(k, 0) for d in infos) for k in set.union(*[set(d) for d in infos])})
-        cur_stats["n_episodes"] = self.batch_size + cur_stats.get("n_episodes", 0)
-        cur_stats["ep_length"] = sum(episode_lengths) + cur_stats.get("ep_length", 0)
+        # cur_stats = self.test_stats if test_mode else self.train_stats
+        # cur_returns = self.test_returns if test_mode else self.train_returns
+        # log_prefix = "test_" if test_mode else ""
+        # infos = [cur_stats] + final_env_infos
+        # cur_stats.update({k: sum(d.get(k, 0) for d in infos) for k in set.union(*[set(d) for d in infos])})
+        # cur_stats["n_episodes"] = self.batch_size + cur_stats.get("n_episodes", 0)
+        # cur_stats["ep_length"] = sum(episode_lengths) + cur_stats.get("ep_length", 0)
 
-        cur_returns.extend(episode_returns)
+        # cur_returns.extend(episode_returns)
 
-        n_test_runs = max(1, self.args.test_nepisode // self.batch_size) * self.batch_size
-        if test_mode and (len(self.test_returns) == n_test_runs):
-            self._log(cur_returns, cur_stats, log_prefix)
-        elif self.t_env - self.log_train_stats_t >= self.args.runner_log_interval:
-            self._log(cur_returns, cur_stats, log_prefix)
-            if hasattr(self.mac.action_selector, "epsilon"):
-                self.logger.log_stat("epsilon", self.mac.action_selector.epsilon, self.t_env)
-            self.log_train_stats_t = self.t_env
+        # n_test_runs = max(1, self.args.test_nepisode // self.batch_size) * self.batch_size
+        # if test_mode and (len(self.test_returns) == n_test_runs):
+        #     self._log(cur_returns, cur_stats, log_prefix)
+        # elif self.training_steps - self.log_train_stats_t >= self.args.runner_log_interval:
+        #     self._log(cur_returns, cur_stats, log_prefix)
+        #     if hasattr(self.mac.action_selector, "epsilon"):
+        #         self.logger.log_stat("epsilon", self.mac.action_selector.epsilon, self.training_steps)
+        #     self.log_train_stats_t = self.training_steps
 
         return self.batch
  
  
-    def run(self, test_mode=False):
+    def run(self, steps, test_mode=False):
         self.reset()
+        self.training_steps = steps
 
         all_terminated = False
         # self.batch_size: 4
@@ -314,31 +316,31 @@ class ParallelRunner:
 
         cur_returns.extend(episode_returns)
 
-        n_test_runs = max(1, self.args.test_nepisode // self.batch_size) * self.batch_size
+        n_test_runs = max(1, self.args.test_nepisode // self.batch_size) * self.batch_size # 20,10
         if test_mode and (len(self.test_returns) == n_test_runs):
             self._log(cur_returns, cur_stats, log_prefix)
-        elif self.t_env - self.log_train_stats_t >= self.args.runner_log_interval:
+        elif self.training_steps - self.log_train_stats_t >= self.args.runner_log_interval:
             self._log(cur_returns, cur_stats, log_prefix)
             if hasattr(self.mac.action_selector, "epsilon"):
-                self.logger.log_stat("epsilon", self.mac.action_selector.epsilon, self.t_env)
-            self.log_train_stats_t = self.t_env
+                self.logger.log_stat("epsilon", self.mac.action_selector.epsilon, self.training_steps)
+            self.log_train_stats_t = self.training_steps
 
         return self.batch
  
     def _log(self, returns, stats, prefix):
-        self.logger.log_stat(prefix + "return_mean", np.mean(returns), self.t_env)
+        self.logger.log_stat(prefix + "return_mean", np.mean(returns), self.training_steps)
         # ------------------------save-------------------------------------------
         # with open('MMM' + '_' + str(300) + '_' +'ICMA-one-step'+ '.txt','a') as f: 
         #     d_time = datetime.datetime.now()
         #     f.write(str(d_time) + '  ' + '| exploration/num steps total: |    ' + str(self.t_env/100) + 
         #             '|, evaluation/Average Returns: |  ' + str(np.mean(returns)) + '|' + '\n') 
         # -----------------------------------------------------------------------
-        self.logger.log_stat(prefix + "return_std", np.std(returns), self.t_env)
+        self.logger.log_stat(prefix + "return_std", np.std(returns), self.training_steps)
         returns.clear()
 
         for k, v in stats.items():
             if k != "n_episodes":
-                self.logger.log_stat(prefix + k + "_mean" , v/stats["n_episodes"], self.t_env)
+                self.logger.log_stat(prefix + k + "_mean" , v/stats["n_episodes"], self.training_steps)
         stats.clear()
 
 

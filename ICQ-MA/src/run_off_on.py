@@ -337,13 +337,15 @@ def run_sequential(args, logger):
     # terminated_h = th.tensor(hdFile_r.get('terminated')).to(args.device)
 
     buffer_mine.addh5py(hdFile_r)
+    max_steps = 1000000
+    offline_steps = 300000
 
     # ----------------------------pre train-------------------------------
     while runner.t_env <= args.t_max:
         # if runner.t_env >= 4000200:
         #     break
 
-        if learner.critic_training_steps >= 200000:
+        if learner.critic_training_steps >= max_steps:
             break
 
         th.set_num_threads(8)
@@ -359,70 +361,44 @@ def run_sequential(args, logger):
             "q_max_var": [],
             "q_min_var": []
         }
-        if learner.critic_training_steps > 100000:# 100000
+        if learner.critic_training_steps > offline_steps:# 100000
             online_explore(runner,buffer_mine)
 
         p = np.random.uniform()
 
-        if learner.critic_training_steps > 100000 and p < 0.5:
+        if learner.critic_training_steps > offline_steps and p < 0.5:
             on_batch = buffer_mine.random_sample(batch_size=32,online=True)
             offline_training(learner,runner,on_batch,running_log,greedy=True) # greedy not implemented
         else:
             off_batch = buffer_mine.random_sample(batch_size=32,online=False)
             offline_training(learner,runner,off_batch,running_log,greedy=False)
 
-        # sample_number = np.random.choice(len(actions_h), 32, replace=False)
-        # filled_sample = filled_h[sample_number]
-        # max_ep_t_h = filled_sample.sum(1).max(0)[0]
-        # filled_sample = filled_sample[:, :max_ep_t_h]
-        # actions_sample = actions_h[sample_number][:, :max_ep_t_h]
-        # actions_onehot_sample = actions_onehot_h[sample_number][:, :max_ep_t_h]
-        # avail_actions_sample = avail_actions_h[sample_number][:, :max_ep_t_h]
-        # obs_sample = obs_h[sample_number][:, :max_ep_t_h]
-        # reward_sample = reward_h[sample_number][:, :max_ep_t_h]
-        # state_sample = state_h[sample_number][:, :max_ep_t_h]
-        # terminated_sample = terminated_h[sample_number][:, :max_ep_t_h]
-
-        # off_batch = {}
-        # off_batch['obs'] = obs_sample
-        # off_batch['reward'] = reward_sample
-        # off_batch['actions'] = actions_sample
-        # off_batch['actions_onehot'] = actions_onehot_sample
-        # off_batch['avail_actions'] = avail_actions_sample
-        # off_batch['filled'] = filled_sample
-        # off_batch['state'] = state_sample
-        # off_batch['terminated'] = terminated_sample
-        # off_batch['batch_size'] = 32
-        # off_batch['max_seq_length'] = max_ep_t_h
-
-        # # --------------------- ICQ-MA --------------------------------
-        # learner.train_critic(off_batch, best_batch=None, log=running_log, t_env=runner.t_env)
-        # learner.train(off_batch, runner.t_env, running_log)
-
         n_test_runs = max(1, args.test_nepisode // runner.batch_size)
-        if (runner.t_env - last_test_T) / args.test_interval >= 1.0: # args.test_interval
-
+        if (learner.critic_training_steps - last_test_T) / args.test_interval >= 1.0: # args.test_interval
             logger.console_logger.info("t_env: {} / {}".format(runner.t_env, args.t_max))
+            logger.console_logger.info("critic_training_steps: {} / {}".format(learner.critic_training_steps, max_steps))
+            logger.console_logger.info("current_online_size: {} / {}".format(buffer_mine.current_online_size, buffer_mine.size))
+
             logger.console_logger.info("Estimated time left: {}. Time passed: {}".format(
-                time_left(last_time, last_test_T, runner.t_env, args.t_max), time_str(time.time() - start_time)))
+                time_left(last_time, last_test_T, learner.critic_training_steps, args.t_max), time_str(time.time() - start_time)))
             last_time = time.time()
 
-            last_test_T = runner.t_env
+            last_test_T = learner.critic_training_steps
             for _ in range(n_test_runs):#2
-                runner.run(test_mode=True)
+                runner.run(learner.critic_training_steps,test_mode=True)
 
-        if args.save_model and (runner.t_env - model_save_time >= args.save_model_interval or model_save_time == 0):
-            model_save_time = runner.t_env
-            save_path = os.path.join(args.local_results_path, "models", args.unique_token, str(runner.t_env))
+        if args.save_model and (learner.critic_training_steps - model_save_time >= args.save_model_interval or model_save_time == 0):
+            model_save_time = learner.critic_training_steps
+            save_path = os.path.join(args.local_results_path, "models", args.unique_token, str(learner.critic_training_steps))
             os.makedirs(save_path, exist_ok=True)
             logger.console_logger.info("Saving models to {}".format(save_path))
 
         episode += args.batch_size_run
 
-        if (runner.t_env - last_log_T) >= args.log_interval:
-            logger.log_stat("episode", episode, runner.t_env)
+        if (learner.critic_training_steps - last_log_T) >= args.log_interval:
+            logger.log_stat("episode", episode, learner.critic_training_steps)
             logger.print_recent_stats()
-            last_log_T = runner.t_env
+            last_log_T = learner.critic_training_steps
         
         episode_num += 1
         update_num += 1
