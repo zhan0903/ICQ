@@ -366,7 +366,7 @@ def run_sequential(args, logger):
 
         p = np.random.uniform()
 
-        if learner.critic_training_steps > offline_steps and p < 0.5:
+        if learner.critic_training_steps > offline_steps and p < 0.5 and False:
             on_batch = buffer_mine.random_sample(batch_size=32,online=True)
             offline_training(learner,runner,on_batch,running_log,greedy=True) # greedy not implemented
         else:
