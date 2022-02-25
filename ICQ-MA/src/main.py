@@ -11,8 +11,9 @@ import torch as th
 # from utils.logging import get_logger
 import yaml
 
-from run import run
+# from run import run
 # from run_off_on import run
+from run_online import run
 
 SETTINGS['CAPTURE_MODE'] = "fd" # set to "no" if you want to see stdout/stderr in console
 # logger = get_logger()
