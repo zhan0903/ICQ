@@ -103,7 +103,7 @@ class OffPGLearner:
             self.logger.log_stat("pi_max", (pi.max(dim=1)[0] * mask).sum().item() / mask.sum().item(), t_env)
             self.log_stats_t = t_env
 
-    def train_critic(self, on_batch, best_batch=None, log=None, t_env=None):
+    def train_critic(self, on_batch, best_batch=None, log=None, t_env=None,beta=1000):
         # on_batch.cude()
         bs = on_batch['batch_size']
         max_t = on_batch['max_seq_length']
@@ -121,7 +121,7 @@ class OffPGLearner:
         # -----------------------------Q_lambda-IS-----------------------
         target_q_taken = th.gather(target_q_vals, dim=3, index=actions).squeeze(3)
         target_q_vals_IS = self.target_mixer(target_q_taken, states) 
-        beta = 1000
+        # beta = 1000
         advantage_Q = F.softmax(target_q_vals_IS / beta, dim=0)
         targets_taken = self.target_mixer(th.gather(target_q_vals, dim=3, index=actions).squeeze(3), states)
         targets_taken = len(advantage_Q) * advantage_Q * targets_taken

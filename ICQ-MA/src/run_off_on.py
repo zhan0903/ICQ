@@ -265,9 +265,9 @@ def evaluate_sequential(args, runner):
     runner.close_env()
 
 
-def offline_training(learner,runner,batch,running_log,greedy=False):
+def offline_training(learner,runner,batch,running_log,beta):
     # --------------------- ICQ-MA --------------------------------
-    learner.train_critic(batch, best_batch=None, log=running_log, t_env=runner.t_env) # add greedy
+    learner.train_critic(batch, best_batch=None, log=running_log, t_env=runner.t_env,beta=beta) # add greedy
     learner.train(batch, runner.t_env, running_log) # add greedy
     
 
@@ -366,12 +366,12 @@ def run_sequential(args, logger):
 
         p = np.random.uniform()
 
-        if learner.critic_training_steps > offline_steps and p < 0.5 and False:
+        if learner.critic_training_steps > offline_steps and p < 0.5:
             on_batch = buffer_mine.random_sample(batch_size=32,online=True)
-            offline_training(learner,runner,on_batch,running_log,greedy=True) # greedy not implemented
+            offline_training(learner,runner,on_batch,running_log,10) # greedy 
         else:
             off_batch = buffer_mine.random_sample(batch_size=32,online=False)
-            offline_training(learner,runner,off_batch,running_log,greedy=False)
+            offline_training(learner,runner,off_batch,running_log,1000) # default 1000
 
         n_test_runs = max(1, args.test_nepisode // runner.batch_size)
         if (learner.critic_training_steps - last_test_T) / args.test_interval >= 1.0: # args.test_interval
