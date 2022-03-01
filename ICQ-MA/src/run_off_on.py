@@ -139,7 +139,7 @@ class replaybuffer_mine:
     def __init__(self) -> None:
         self.current_online_size = 0
         self.size = 0
-        self.online_window = 200
+        self.online_window = 100
         
     def add_online_batch(self,batch):# sample trajectories not tuples
         # c = torch.cat((c, ones), 1)
