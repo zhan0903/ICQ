@@ -139,7 +139,7 @@ class replaybuffer_mine:
     def __init__(self) -> None:
         self.current_online_size = 0
         self.size = 0
-        self.online_window = 100
+        self.online_window = 200
         
     def add_online_batch(self,batch):# sample trajectories not tuples
         # c = torch.cat((c, ones), 1)
@@ -368,7 +368,7 @@ def run_sequential(args, logger):
 
         if learner.critic_training_steps > offline_steps and p < 0.5:
             on_batch = buffer_mine.random_sample(batch_size=32,online=True)
-            offline_training(learner,runner,on_batch,running_log,100) # greedy 
+            offline_training(learner,runner,on_batch,running_log,1000) # greedy 
         else:
             off_batch = buffer_mine.random_sample(batch_size=32,online=False)
             offline_training(learner,runner,off_batch,running_log,1000) # default 1000
